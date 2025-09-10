@@ -69,7 +69,13 @@
     .highlight { outline: 3px solid #60a5fa; border-radius: 12px; }
     .status { position: sticky; top:0; z-index:5; }
     .counter { font-size: 12px; color:#475569; margin-bottom: 8px; }
-  </style>
+  
+.ok{ color:#065f46;background:#ecfdf5;padding:6px 8px;border-radius:8px;border:1px solid #a7f3d0 }
+.warn{ color:#b45309;background:#fff7ed;padding:6px 8px;border-radius:8px;border:1px solid #fde68a }
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; align-items:center; }
+.toolbar .btn.small { padding:4px 8px; font-size:12px; }
+.empty-hint { font-size:13px; color:#475569; background:#f1f5f9; border:1px dashed #cbd5e1; padding:10px; border-radius:10px; }
+</style>
 </head>
 <body>
 <header>
@@ -103,6 +109,15 @@
 <button class="btn" id="clearSearch">X</button>
 </div>
 <div class="counter" id="counter"></div>
+<div class="toolbar">
+<label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;">
+<input id="toggleAll" type="checkbox"/>
+    Mostrar asignados
+  </label>
+<button class="btn small" id="btnReset">Reiniciar plan</button>
+<button class="btn small" id="btnClearLS">Borrar guardado local</button>
+</div>
+
 <div class="small muted">Asignados se ocultan automáticamente. Edita nombres aquí. No se permiten <strong>nombres duplicados</strong>.</div>
 <div id="guestList"></div>
 </div>
@@ -243,11 +258,28 @@
     // Drawer & list
     function openDrawer(){ document.getElementById('drawer').classList.add('open'); renderGuestList(); }
     function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); }
+    
+    function clearLocal(){
+      try{ localStorage.removeItem(STORAGE_KEY); actualizarStatus("Guardado local eliminado."); }catch{}
+    }
+    function resetPlan(){
+      // Restaurar lista original y limpiar todas las mesas
+      try {
+        PEOPLE = JSON.parse(JSON.stringify(PEOPLE_ORIG));
+      } catch(e){ /* por si acaso */ }
+      MESAS.forEach(m => modelo.get(m).forEach(s=>{ s.ID=null; s.ROL="INV"; }));
+      localStorage.removeItem(STORAGE_KEY);
+      actualizarStatus("Plan reiniciado con lista original.");
+      render();
+    }
+
+
     function filteredGuests(){
       const q = document.getElementById('searchGuest').value.toLowerCase().trim();
       const arr = Object.entries(PEOPLE).map(([id, obj])=>({id: Number(id), ...obj}));
-      const unseated = arr.filter(p => !isSeated(p.id));
-      const filtered = !q ? unseated :
+      const showAll = document.getElementById('toggleAll') && document.getElementById('toggleAll').checked;
+      const base = showAll ? arr : arr.filter(p => !isSeated(p.id));
+      const filtered = !q ? base :
         unseated.filter(p => (p.Nombre||"").toLowerCase().includes(q) || (p.GRUPO||"").toLowerCase().includes(q));
       return filtered.sort((a,b)=> a.GRUPO.localeCompare(b.GRUPO) || a.Nombre.localeCompare(b.Nombre));
     }
@@ -256,7 +288,13 @@
       const counter = document.getElementById('counter');
       const list = filteredGuests();
       box.innerHTML = "";
-      counter.textContent = `Invitados sin asignar: ${list.length}`;
+      counter.textContent = `Invitados sin asignar: ${list.filter(p=>!isSeated(p.id)).length}`;
+      if (list.length===0){
+        const hint = document.createElement('div');
+        hint.className = 'empty-hint';
+        hint.innerHTML = `No hay invitados para mostrar.<br>• Puede que todos estén asignados.<br>• Activa "Mostrar asignados" o pulsa "Reiniciar plan".`;
+        box.appendChild(hint);
+      }
       list.forEach(p => {
         const item = document.createElement('div');
         item.className = 'guest-item';
@@ -395,6 +433,14 @@ function render(){
       app.innerHTML = "";
       MESAS.forEach(m => app.appendChild(renderMesaCard(m)));
       renderGuestList();
+      
+    const tgl = document.getElementById('toggleAll');
+    if (tgl){ tgl.onchange = ()=> renderGuestList(); }
+    const btnR = document.getElementById('btnReset');
+    if (btnR){ btnR.onclick = resetPlan; btnR.ontouchend = (e)=>{ e.preventDefault(); resetPlan(); }; }
+    const btnC = document.getElementById('btnClearLS');
+    if (btnC){ btnC.onclick = ()=>{ clearLocal(); }; btnC.ontouchend = (e)=>{ e.preventDefault(); clearLocal(); }; }
+
     }
 
     // Search best match among unseated
