@@ -117,7 +117,6 @@
 <button class="btn small" id="btnReset">Reiniciar plan</button>
 <button class="btn small" id="btnClearLS">Borrar guardado local</button>
 </div>
-
 <div class="small muted">Asignados se ocultan automáticamente. Edita nombres aquí. No se permiten <strong>nombres duplicados</strong>.</div>
 <div id="guestList"></div>
 </div>
@@ -159,7 +158,23 @@
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved){ try{ restore(JSON.parse(saved)); }catch{} }
 
-    function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot())); actualizarStatus("Guardado en el dispositivo."); }
+    
+    // Auto-cargar lista original si no hay personas en memoria
+    if (!saved) {
+      try {
+        PEOPLE = JSON.parse(JSON.stringify(PEOPLE_ORIG));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot()));
+      } catch(e){ /* no-op */ }
+    } else {
+      // Si por alguna razón la restauración dejó la lista vacía, cargar originales
+      if (!PEOPLE || Object.keys(PEOPLE).length === 0) {
+        try {
+          PEOPLE = JSON.parse(JSON.stringify(PEOPLE_ORIG));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot()));
+        } catch(e){ /* no-op */ }
+      }
+    }
+function saveLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot())); actualizarStatus("Guardado en el dispositivo."); }
     function autoSave(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot())); }
 
     function actualizarStatus(msg, warn=false){
